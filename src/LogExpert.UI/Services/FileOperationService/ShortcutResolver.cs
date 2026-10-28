@@ -69,8 +69,6 @@ internal static class ShortcutResolver
 
             if (hop >= MAX_SHORTCUT_HOPS)
             {
-                // Keep the input, not the partially followed path: another call site resolving
-                // the result again would otherwise continue past the limit.
                 _logger.Warn("Shortcut chain starting at {Shortcut} exceeds {Limit} hops; keeping it", fileName, MAX_SHORTCUT_HOPS);
                 return fileName;
             }
@@ -85,10 +83,6 @@ internal static class ShortcutResolver
         }
     }
 
-    /// <summary>
-    /// Normalizes a raw shortcut target and returns it only when it is a plain local drive path
-    /// (<c>X:\</c>); anything that could reach the network yields <see langword="null"/>.
-    /// </summary>
     internal static string? SanitizeLocalTarget (string target, string shortcutDirectory)
     {
         try
@@ -118,9 +112,6 @@ internal static class ShortcutResolver
                && Path.GetExtension(fileName).Equals(SHORTCUT_EXTENSION, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// Resolves a single shortcut hop, or returns <see langword="null"/> when it cannot be followed.
-    /// </summary>
     private static string? ResolveOneHop (string fileName)
     {
         IShellLinkW? shellLink = null;
@@ -152,7 +143,6 @@ internal static class ShortcutResolver
                 return null;
             }
 
-            // A relative target sits next to the shortcut, not in the current working directory.
             var shortcutDirectory = Path.GetDirectoryName(Path.GetFullPath(fileName))!;
 
             // The target comes straight from the .lnk bytes, so only follow a plain local drive path:

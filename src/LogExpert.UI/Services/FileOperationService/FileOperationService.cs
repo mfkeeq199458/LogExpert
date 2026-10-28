@@ -68,8 +68,11 @@ internal sealed class FileOperationService (
 
     public LogWindow AddFileTab (FileTabRequest request)
     {
-        request = request with { FileName = ShortcutResolver.Resolve(request.FileName) };
+        return AddResolvedFileTab(request with { FileName = ShortcutResolver.Resolve(request.FileName) });
+    }
 
+    private LogWindow AddResolvedFileTab (FileTabRequest request)
+    {
         var logFileName = PersisterHelpers.FindFilenameForSettings(request.FileName, _pluginRegistry);
         var normalizedPath = Path.GetFullPath(logFileName);
 
@@ -201,13 +204,13 @@ internal sealed class FileOperationService (
 
     public LogWindow? AddMultiFileTab (string[] fileNames)
     {
-        if (fileNames.Length < 1)
-        {
-            return null;
-        }
+        return fileNames.Length < 1
+            ? null
+            : AddResolvedMultiFileTab(fileNames.Select(ShortcutResolver.Resolve).ToArray());
+    }
 
-        fileNames = fileNames.Select(ShortcutResolver.Resolve).ToArray();
-
+    private LogWindow? AddResolvedMultiFileTab (string[] fileNames)
+    {
         // Session files (.lxj) aren't logs — dispatch them to the project loader and
         // continue with only the log files. Without this, the .lxj would be treated as
         // a raw log line in the multi-file tab.
@@ -216,7 +219,7 @@ internal sealed class FileOperationService (
             AddFileTabs(fileNames.Where(f => f.EndsWith(".lxj", StringComparison.OrdinalIgnoreCase)).ToArray());
 
             var logs = fileNames.Where(f => !f.EndsWith(".lxj", StringComparison.OrdinalIgnoreCase)).ToArray();
-            return logs.Length > 0 ? AddMultiFileTab(logs) : null;
+            return logs.Length > 0 ? AddResolvedMultiFileTab(logs) : null;
         }
 
         EncodingOptions encodingOptions = new();
@@ -270,12 +273,6 @@ internal sealed class FileOperationService (
     }
     public MultiFileDecision LoadFilesWithOption (string[] fileNames, bool invertLogic)
     {
-        // Resolve before sorting so multi-file order follows the targets, not the shortcut names.
-        for (var i = 0; i < fileNames.Length; i++)
-        {
-            fileNames[i] = ShortcutResolver.Resolve(fileNames[i]);
-        }
-
         Array.Sort(fileNames, StringComparer.OrdinalIgnoreCase);
 
         if (fileNames.Length == 1)
@@ -286,7 +283,7 @@ internal sealed class FileOperationService (
                 return MultiFileDecision.Cancel; // Already handled
             }
 
-            _ = AddFileTab(new FileTabRequest { FileName = logFile });
+            _ = AddResolvedFileTab(new FileTabRequest { FileName = logFile });
             return MultiFileDecision.SingleFiles;
         }
 
@@ -326,7 +323,7 @@ internal sealed class FileOperationService (
                     continue;
                 }
 
-                _ = AddFileTab(new FileTabRequest { FileName = logFile, TargetLine = targetLine });
+                _ = AddResolvedFileTab(new FileTabRequest { FileName = logFile, TargetLine = targetLine });
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or LogFileException)
             {
@@ -335,11 +332,6 @@ internal sealed class FileOperationService (
         }
     }
 
-    /// <summary>
-    /// Resolves a possible shortcut and dispatches a resolved session file (<c>.lxj</c>) to the
-    /// session loader. Returns the name to open as a log, or <see langword="null"/> when the file
-    /// was a session and has been handled.
-    /// </summary>
     private string? ResolveLogFile (string fileName, bool asFirstFile)
     {
         var resolved = ShortcutResolver.Resolve(fileName);

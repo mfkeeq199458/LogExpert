@@ -509,8 +509,7 @@ internal class FileOperationServiceTests : IDisposable
     [TestCase(1, true, 1)]
     public void LoadDroppedFiles_CombinedChoice_ReadsAccessibleSelectedFiles (int unavailableIndex, bool lockFile, int expectedLines)
     {
-        var directory = Path.Join(Path.GetTempPath(), "LogExpertDropRouting", Guid.NewGuid().ToString());
-        _ = Directory.CreateDirectory(directory);
+        var directory = TestShortcuts.CreateTempDirectory("DropRouting");
         var first = Path.Join(directory, "a.log");
         var second = Path.Join(directory, "b.txt");
         File.WriteAllText(first, "first\n");
@@ -575,8 +574,7 @@ internal class FileOperationServiceTests : IDisposable
     [Test]
     public void LoadDroppedFiles_CombinedSessionAndLog_DoesNotOpenUnselectedRotations ()
     {
-        var directory = Path.Join(Path.GetTempPath(), "LogExpertDropRouting", Guid.NewGuid().ToString());
-        _ = Directory.CreateDirectory(directory);
+        var directory = TestShortcuts.CreateTempDirectory("DropRouting");
         var log = Path.Join(directory, "b.log");
         var session = Path.Join(directory, "session.lxj");
         File.WriteAllText(log, "selected\n");
@@ -606,8 +604,7 @@ internal class FileOperationServiceTests : IDisposable
     [Test]
     public void LoadDroppedFiles_CombinedSelectionAfterTruncation_KeepsOnlySelectedPaths ()
     {
-        var directory = Path.Join(Path.GetTempPath(), "LogExpertDropRouting", Guid.NewGuid().ToString());
-        _ = Directory.CreateDirectory(directory);
+        var directory = TestShortcuts.CreateTempDirectory("DropRouting");
         var first = Path.Join(directory, "a.log");
         var second = Path.Join(directory, "b.log");
         File.WriteAllText(first, "first\n");
@@ -660,13 +657,15 @@ internal class FileOperationServiceTests : IDisposable
     [Test]
     public void LoadFilesWithOption_ShortcutToLxjFile_CallsProjectCallback ()
     {
-        // The .lxj check has to run on the resolved name, or the shortcut gets opened as a raw log.
+        // Arrange — the .lxj check has to run on the resolved name, or the shortcut gets opened as a raw log.
         var (directory, shortcut, session) = CreateShortcutToSession();
 
         try
         {
+            // Act
             var decision = _sut.LoadFilesWithOption(new[] { shortcut }, false);
 
+            // Assert
             Assert.That(decision, Is.EqualTo(MultiFileDecision.Cancel));
             Assert.That(_projectCallbackCalls, Has.Count.EqualTo(1));
             Assert.That(_projectCallbackCalls[0].FileName, Is.EqualTo(session));
@@ -681,12 +680,15 @@ internal class FileOperationServiceTests : IDisposable
     [Test]
     public void AddFileTabs_ShortcutToLxjFile_CallsProjectCallback ()
     {
+        // Arrange
         var (directory, shortcut, session) = CreateShortcutToSession();
 
         try
         {
+            // Act
             _sut.AddFileTabs(new[] { shortcut });
 
+            // Assert
             Assert.That(_projectCallbackCalls, Has.Count.EqualTo(1));
             Assert.That(_projectCallbackCalls[0].FileName, Is.EqualTo(session));
             Assert.That(_factoryCalls, Is.Empty, "Should not open the shortcut as a log");
@@ -700,8 +702,8 @@ internal class FileOperationServiceTests : IDisposable
     [Test]
     public void AddFileTab_ShortcutToLogFile_OpensTarget ()
     {
-        var directory = Path.Join(Path.GetTempPath(), "LogExpertTests", "ShortcutLog", Guid.NewGuid().ToString());
-        _ = Directory.CreateDirectory(directory);
+        // Arrange
+        var directory = TestShortcuts.CreateTempDirectory("ShortcutLog");
 
         try
         {
@@ -711,8 +713,10 @@ internal class FileOperationServiceTests : IDisposable
             var shortcut = Path.Join(directory, "actual.lnk");
             TestShortcuts.Create(shortcut, log);
 
+            // Act
             _sut.AddFileTab(new FileTabRequest { FileName = shortcut });
 
+            // Assert
             Assert.That(_factoryCalls, Has.Count.EqualTo(1));
             Assert.That(_factoryCalls[0].Request.FileName, Is.EqualTo(log), "the target file is opened, not the shortcut");
         }
@@ -1290,14 +1294,9 @@ internal class FileOperationServiceTests : IDisposable
         Assert.That(_factoryCalls[1].Request.FileName, Is.EqualTo("b.log"));
     }
 
-    /// <summary>
-    /// Creates a temporary directory holding a session file and a shortcut to it, and returns the
-    /// three paths. The caller owns the directory and deletes it.
-    /// </summary>
     private static (string Directory, string Shortcut, string Session) CreateShortcutToSession ()
     {
-        var directory = Path.Join(Path.GetTempPath(), "LogExpertTests", "ShortcutSession", Guid.NewGuid().ToString());
-        _ = Directory.CreateDirectory(directory);
+        var directory = TestShortcuts.CreateTempDirectory("ShortcutSession");
 
         var session = Path.Join(directory, "project.lxj");
         File.WriteAllText(session, "<Project></Project>");
@@ -1308,10 +1307,6 @@ internal class FileOperationServiceTests : IDisposable
         return (directory, shortcut, session);
     }
 
-    /// <summary>
-    /// Builds a second service on the shared config manager, standing in for another LogTabWindow
-    /// of the same session with its own tab controller.
-    /// </summary>
     private FileOperationService CreateServiceForWindows (params LogWindow[] windows)
     {
         var tabControllerMock = new Mock<ITabController>();

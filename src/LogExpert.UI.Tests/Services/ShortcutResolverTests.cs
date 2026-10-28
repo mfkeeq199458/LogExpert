@@ -13,7 +13,7 @@ internal class ShortcutResolverTests
     [Test]
     public void Resolve_ShortcutToLocalTarget_ReturnsTarget ()
     {
-        var directory = CreateTempDirectory("ShortcutLocal");
+        var directory = TestShortcuts.CreateTempDirectory("ShortcutLocal");
 
         try
         {
@@ -34,7 +34,7 @@ internal class ShortcutResolverTests
     [Test]
     public void Resolve_ShortcutToUncTarget_ReturnsShortcutUnchanged ()
     {
-        var directory = CreateTempDirectory("ShortcutUnc");
+        var directory = TestShortcuts.CreateTempDirectory("ShortcutUnc");
 
         try
         {
@@ -53,7 +53,7 @@ internal class ShortcutResolverTests
     [Test]
     public void Resolve_OversizedShortcutFile_ReturnsPathUnchanged ()
     {
-        var directory = CreateTempDirectory("ShortcutOversized");
+        var directory = TestShortcuts.CreateTempDirectory("ShortcutOversized");
 
         try
         {
@@ -167,12 +167,5 @@ internal class ShortcutResolverTests
         }
 
         return targets;
-    }
-
-    private static string CreateTempDirectory (string name)
-    {
-        var directory = Path.Join(Path.GetTempPath(), "LogExpertTests", name, Guid.NewGuid().ToString());
-        _ = Directory.CreateDirectory(directory);
-        return directory;
     }
 }
