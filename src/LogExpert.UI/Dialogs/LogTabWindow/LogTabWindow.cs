@@ -81,10 +81,6 @@ internal partial class LogTabWindow : Form, ILogTabWindow
 
     private bool _wasMaximized;
 
-    /// <summary>
-    /// Owns detach mode: F11 hides the main window and keeps the active log window floating;
-    /// F11 leaves the mode again.
-    /// </summary>
     private readonly DetachModeController _detachModeController;
 
     #endregion
@@ -471,7 +467,7 @@ internal partial class LogTabWindow : Form, ILogTabWindow
         timeshiftToolStripMenuItem.Text = Resources.LogTabWindow_UI_ToolStripMenuItem_timeshiftToolStripMenuItem;
         timeshiftToolStripTextBox.Text = Resources.LogTabWindow_UI_ToolStripTextBox_timeshiftToolStripTextBox;
         copyMarkedLinesIntoNewTabToolStripMenuItem.Text = Resources.LogTabWindow_UI_ToolStripMenuItem_copyMarkedLinesIntoNewTabToolStripMenuItem;
-        logOnlyViewToolStripMenuItem.Text = Resources.LogTabWindow_UI_ToolStripMenuItem_logOnlyViewToolStripMenuItem;
+        detachModeToolStripMenuItem.Text = Resources.LogTabWindow_UI_ToolStripMenuItem_detachModeToolStripMenuItem;
 
         //Options menu
         optionToolStripMenuItem.Text = Resources.LogTabWindow_UI_ToolStripMenuItem_optionToolStripMenuItem;
@@ -528,7 +524,7 @@ internal partial class LogTabWindow : Form, ILogTabWindow
         saveSessionToolStripMenuItem.ToolTipText = Resources.LogTabWindow_UI_ToolStripMenuItem_ToolTip_saveProjectToolStripMenuItem;
         timeshiftToolStripMenuItem.ToolTipText = Resources.LogTabWindow_UI_ToolStripMenuItem_ToolTip_timeshiftToolStripMenuItem;
         copyMarkedLinesIntoNewTabToolStripMenuItem.ToolTipText = Resources.LogTabWindow_UI_ToolStripMenuItem_ToolTip_copyMarkedLinesIntoNewTabToolStripMenuItem;
-        logOnlyViewToolStripMenuItem.ToolTipText = Resources.LogTabWindow_UI_ToolStripMenuItem_ToolTip_logOnlyViewToolStripMenuItem;
+        detachModeToolStripMenuItem.ToolTipText = Resources.LogTabWindow_UI_ToolStripMenuItem_ToolTip_detachModeToolStripMenuItem;
         columnizerToolStripMenuItem.ToolTipText = Resources.LogTabWindow_UI_ToolStripMenuItem_ToolTip_columnizerToolStripMenuItem;
         cellSelectModeToolStripMenuItem.ToolTipText = Resources.LogTabWindow_UI_ToolStripMenuItem_ToolTip_cellSelectModeToolStripMenuItem;
         lockInstanceToolStripMenuItem.ToolTipText = Resources.LogTabWindow_UI_ToolStripMenuItem_ToolTip_lockInstanceToolStripMenuItem;
@@ -852,8 +848,6 @@ internal partial class LogTabWindow : Form, ILogTabWindow
 
             if (_detachModeController.IsActive)
             {
-                // While detached the main window is hidden, so the newly opened window is the one
-                // the user expects to see: it replaces the detached one.
                 _detachModeController.OnWindowAdded(logWindow);
             }
         }
@@ -1495,7 +1489,6 @@ internal partial class LogTabWindow : Form, ILogTabWindow
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0010:Add missing cases", Justification = "no need for the other switch cases")]
     private void LoadSession (string sessionFileName, bool restoreLayout)
     {
-        // Leave detach mode first so the loaded layout describes the normal window.
         _detachModeController.Exit();
 
         var outcome = _sessionHandler.LoadSession(sessionFileName);
@@ -1775,7 +1768,6 @@ internal partial class LogTabWindow : Form, ILogTabWindow
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Shutdown must continue even when detach mode cannot be restored.")]
     private void OnLogTabWindowFormClosing (object sender, CancelEventArgs e)
     {
-        // Leave detach mode first so the saved layout describes the normal main window.
         try
         {
             _detachModeController.Exit();
@@ -1827,8 +1819,6 @@ internal partial class LogTabWindow : Form, ILogTabWindow
         RemoveLogWindow(logWindow);
 
         logWindow.Tag = null;
-
-        // Closing the detached window ends detach mode and brings the main window back.
         _detachModeController.OnWindowDisposed(logWindow);
     }
 
@@ -2458,8 +2448,8 @@ internal partial class LogTabWindow : Form, ILogTabWindow
     {
         var activeWindow = _tabController.GetActiveWindow();
         var closeList = _tabController.GetAllWindowsFromDockPanel()
-            .Where(window => window != activeWindow)
-            .ToList();
+                .Where(window => window != activeWindow)
+                .ToList();
 
         foreach (var logWindow in closeList)
         {
