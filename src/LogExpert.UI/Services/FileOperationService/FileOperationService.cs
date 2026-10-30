@@ -125,7 +125,8 @@ internal sealed class FileOperationService (
             LogWindow = logWindow,
             Request = request,
             ResolvedFileName = logFileName,
-            EncodingOptions = encodingOptions
+            EncodingOptions = encodingOptions,
+            UnresolvedShortcuts = ShortcutResolver.IsShortcut(request.FileName) ? [request.FileName] : null
         });
 
         return logWindow;
@@ -211,6 +212,11 @@ internal sealed class FileOperationService (
 
     private LogWindow? AddResolvedMultiFileTab (string[] fileNames)
     {
+        // Shortcuts are already resolved by the caller. Sorting here keeps multi-file order by
+        // target name on every entry path (drop, command line, Ask → MultiFile, ...) instead of
+        // letting it drift back to shortcut names.
+        Array.Sort(fileNames, StringComparer.OrdinalIgnoreCase);
+
         // Session files (.lxj) aren't logs — dispatch them to the project loader and
         // continue with only the log files. Without this, the .lxj would be treated as
         // a raw log line in the multi-file tab.
@@ -238,13 +244,16 @@ internal sealed class FileOperationService (
         // We raise FileOpened with MultiFileNames so LogTabWindow can call BeginInvoke(logWindow.LoadFilesAsMulti, ...).
         AddToFileHistory(fileNames[0]);
 
+        var unresolvedShortcuts = fileNames.Where(ShortcutResolver.IsShortcut).ToArray();
+
         FileOpened?.Invoke(this, new FileOpenedEventArgs
         {
             LogWindow = logWindow,
             Request = request,
             ResolvedFileName = fileNames[^1],
             EncodingOptions = encodingOptions,
-            MultiFileNames = fileNames
+            MultiFileNames = fileNames,
+            UnresolvedShortcuts = unresolvedShortcuts.Length > 0 ? unresolvedShortcuts : null
         });
 
         return logWindow;

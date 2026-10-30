@@ -13,6 +13,7 @@ internal class ShortcutResolverTests
     [Test]
     public void Resolve_ShortcutToLocalTarget_ReturnsTarget ()
     {
+        // Arrange
         var directory = TestShortcuts.CreateTempDirectory("ShortcutLocal");
 
         try
@@ -23,7 +24,11 @@ internal class ShortcutResolverTests
             var shortcut = Path.Join(directory, "actual.lnk");
             TestShortcuts.Create(shortcut, log);
 
-            Assert.That(ShortcutResolver.Resolve(shortcut), Is.EqualTo(log));
+            // Act
+            var resolved = ShortcutResolver.Resolve(shortcut);
+
+            // Assert
+            Assert.That(resolved, Is.EqualTo(log));
         }
         finally
         {
@@ -34,6 +39,7 @@ internal class ShortcutResolverTests
     [Test]
     public void Resolve_ShortcutToUncTarget_ReturnsShortcutUnchanged ()
     {
+        // Arrange
         var directory = TestShortcuts.CreateTempDirectory("ShortcutUnc");
 
         try
@@ -41,7 +47,11 @@ internal class ShortcutResolverTests
             var shortcut = Path.Join(directory, "remote.lnk");
             TestShortcuts.Create(shortcut, @"\\nonexistent-host\share\actual.log");
 
-            Assert.That(ShortcutResolver.Resolve(shortcut), Is.EqualTo(shortcut),
+            // Act
+            var resolved = ShortcutResolver.Resolve(shortcut);
+
+            // Assert
+            Assert.That(resolved, Is.EqualTo(shortcut),
                 "a UNC target must not be probed: File.Exists would authenticate against the remote host");
         }
         finally
@@ -53,6 +63,7 @@ internal class ShortcutResolverTests
     [Test]
     public void Resolve_OversizedShortcutFile_ReturnsPathUnchanged ()
     {
+        // Arrange
         var directory = TestShortcuts.CreateTempDirectory("ShortcutOversized");
 
         try
@@ -60,7 +71,11 @@ internal class ShortcutResolverTests
             var shortcut = Path.Join(directory, "oversized.lnk");
             File.WriteAllBytes(shortcut, new byte[ShortcutResolver.MAX_SHORTCUT_SIZE + 1]);
 
-            Assert.That(ShortcutResolver.Resolve(shortcut), Is.EqualTo(shortcut));
+            // Act
+            var resolved = ShortcutResolver.Resolve(shortcut);
+
+            // Assert
+            Assert.That(resolved, Is.EqualTo(shortcut));
         }
         finally
         {
@@ -73,45 +88,61 @@ internal class ShortcutResolverTests
     [Test]
     public void FollowChain_ShortcutToShortcut_ReturnsFinalTarget ()
     {
+        // Arrange
         var targets = new Dictionary<string, string>
         {
             [@"C:\logs\first.lnk"] = @"C:\logs\second.lnk",
             [@"C:\logs\second.lnk"] = @"C:\logs\actual.log"
         };
 
-        Assert.That(ShortcutResolver.FollowChain(@"C:\logs\first.lnk", path => targets.GetValueOrDefault(path)),
-            Is.EqualTo(@"C:\logs\actual.log"));
+        // Act
+        var resolved = ShortcutResolver.FollowChain(@"C:\logs\first.lnk", path => targets.GetValueOrDefault(path));
+
+        // Assert
+        Assert.That(resolved, Is.EqualTo(@"C:\logs\actual.log"));
     }
 
     [Test]
     public void FollowChain_ChainAtLimit_ReturnsFinalTarget ()
     {
+        // Arrange
         var targets = CreateChain(ShortcutResolver.MAX_SHORTCUT_HOPS);
 
-        Assert.That(ShortcutResolver.FollowChain(@"C:\logs\link1.lnk", path => targets.GetValueOrDefault(path)),
-            Is.EqualTo(@"C:\logs\actual.log"));
+        // Act
+        var resolved = ShortcutResolver.FollowChain(@"C:\logs\link1.lnk", path => targets.GetValueOrDefault(path));
+
+        // Assert
+        Assert.That(resolved, Is.EqualTo(@"C:\logs\actual.log"));
     }
 
     [Test]
     public void FollowChain_ChainBeyondLimit_StopsAfterMaxHops ()
     {
+        // Arrange
         var targets = CreateChain(ShortcutResolver.MAX_SHORTCUT_HOPS + 1);
 
-        Assert.That(ShortcutResolver.FollowChain(@"C:\logs\link1.lnk", path => targets.GetValueOrDefault(path)),
-            Is.EqualTo(@"C:\logs\link1.lnk"));
+        // Act
+        var resolved = ShortcutResolver.FollowChain(@"C:\logs\link1.lnk", path => targets.GetValueOrDefault(path));
+
+        // Assert
+        Assert.That(resolved, Is.EqualTo(@"C:\logs\link1.lnk"));
     }
 
     [Test]
     public void FollowChain_CyclicChain_StopsAfterMaxHops ()
     {
+        // Arrange
         var targets = new Dictionary<string, string>
         {
             [@"C:\logs\first.lnk"] = @"C:\logs\second.lnk",
             [@"C:\logs\second.lnk"] = @"C:\logs\first.lnk"
         };
 
-        Assert.That(ShortcutResolver.FollowChain(@"C:\logs\first.lnk", path => targets.GetValueOrDefault(path)),
-            Is.EqualTo(@"C:\logs\first.lnk"));
+        // Act
+        var resolved = ShortcutResolver.FollowChain(@"C:\logs\first.lnk", path => targets.GetValueOrDefault(path));
+
+        // Assert
+        Assert.That(resolved, Is.EqualTo(@"C:\logs\first.lnk"));
     }
 
     [TestCase("//nonexistent-host/share/actual.log")]
@@ -121,33 +152,56 @@ internal class ShortcutResolverTests
     [TestCase(@"\??\UNC\nonexistent-host\share\actual.log")]
     public void SanitizeLocalTarget_DisguisedNonLocalTarget_IsRejected (string target)
     {
-        Assert.That(ShortcutResolver.SanitizeLocalTarget(target, @"C:\logs"), Is.Null,
+        // Arrange
+        const string shortcutDirectory = @"C:\logs";
+
+        // Act
+        var sanitized = ShortcutResolver.SanitizeLocalTarget(target, shortcutDirectory);
+
+        // Assert
+        Assert.That(sanitized, Is.Null,
             $"'{target}' must not be followed: probing it could reach the network");
     }
 
     [Test]
     public void SanitizeLocalTarget_PlainLocalTarget_ReturnsFullPath ()
     {
-        Assert.That(ShortcutResolver.SanitizeLocalTarget(@"C:\logs\actual.log", @"D:\other"),
-            Is.EqualTo(@"C:\logs\actual.log"));
+        // Arrange
+        const string target = @"C:\logs\actual.log";
+
+        // Act
+        var sanitized = ShortcutResolver.SanitizeLocalTarget(target, @"D:\other");
+
+        // Assert
+        Assert.That(sanitized, Is.EqualTo(target));
     }
 
     [Test]
     public void SanitizeLocalTarget_RelativeTarget_ResolvesAgainstShortcutDirectory ()
     {
-        Assert.That(ShortcutResolver.SanitizeLocalTarget(@"sub\actual.log", @"C:\logs"),
-            Is.EqualTo(@"C:\logs\sub\actual.log"));
+        // Arrange
+        const string target = @"sub\actual.log";
+
+        // Act
+        var sanitized = ShortcutResolver.SanitizeLocalTarget(target, @"C:\logs");
+
+        // Assert
+        Assert.That(sanitized, Is.EqualTo(@"C:\logs\sub\actual.log"));
     }
 
     [Test]
     public void SanitizeLocalTarget_EnvironmentVariableTarget_IsExpanded ()
     {
+        // Arrange
         Environment.SetEnvironmentVariable("LOGEXPERT_TEST_VAR", @"C:\logs", EnvironmentVariableTarget.Process);
 
         try
         {
-            Assert.That(ShortcutResolver.SanitizeLocalTarget(@"%LOGEXPERT_TEST_VAR%\actual.log", @"D:\other"),
-                Is.EqualTo(@"C:\logs\actual.log"));
+            // Act
+            var sanitized = ShortcutResolver.SanitizeLocalTarget(@"%LOGEXPERT_TEST_VAR%\actual.log", @"D:\other");
+
+            // Assert
+            Assert.That(sanitized, Is.EqualTo(@"C:\logs\actual.log"));
         }
         finally
         {

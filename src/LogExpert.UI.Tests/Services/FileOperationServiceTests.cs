@@ -509,7 +509,8 @@ internal class FileOperationServiceTests : IDisposable
     [TestCase(1, true, 1)]
     public void LoadDroppedFiles_CombinedChoice_ReadsAccessibleSelectedFiles (int unavailableIndex, bool lockFile, int expectedLines)
     {
-        var directory = TestShortcuts.CreateTempDirectory("DropRouting");
+        var directory = Path.Join(Path.GetTempPath(), "LogExpertDropRouting", Guid.NewGuid().ToString());
+        _ = Directory.CreateDirectory(directory);
         var first = Path.Join(directory, "a.log");
         var second = Path.Join(directory, "b.txt");
         File.WriteAllText(first, "first\n");
@@ -574,7 +575,8 @@ internal class FileOperationServiceTests : IDisposable
     [Test]
     public void LoadDroppedFiles_CombinedSessionAndLog_DoesNotOpenUnselectedRotations ()
     {
-        var directory = TestShortcuts.CreateTempDirectory("DropRouting");
+        var directory = Path.Join(Path.GetTempPath(), "LogExpertDropRouting", Guid.NewGuid().ToString());
+        _ = Directory.CreateDirectory(directory);
         var log = Path.Join(directory, "b.log");
         var session = Path.Join(directory, "session.lxj");
         File.WriteAllText(log, "selected\n");
@@ -604,7 +606,8 @@ internal class FileOperationServiceTests : IDisposable
     [Test]
     public void LoadDroppedFiles_CombinedSelectionAfterTruncation_KeepsOnlySelectedPaths ()
     {
-        var directory = TestShortcuts.CreateTempDirectory("DropRouting");
+        var directory = Path.Join(Path.GetTempPath(), "LogExpertDropRouting", Guid.NewGuid().ToString());
+        _ = Directory.CreateDirectory(directory);
         var first = Path.Join(directory, "a.log");
         var second = Path.Join(directory, "b.log");
         File.WriteAllText(first, "first\n");
@@ -719,6 +722,64 @@ internal class FileOperationServiceTests : IDisposable
             // Assert
             Assert.That(_factoryCalls, Has.Count.EqualTo(1));
             Assert.That(_factoryCalls[0].Request.FileName, Is.EqualTo(log), "the target file is opened, not the shortcut");
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
+    public void AddFileTab_UnresolvableShortcut_ReportsItInFileOpened ()
+    {
+        // Arrange
+        var directory = TestShortcuts.CreateTempDirectory("ShortcutBroken");
+
+        try
+        {
+            var shortcut = Path.Join(directory, "broken.lnk");
+            TestShortcuts.Create(shortcut, Path.Join(directory, "missing.log"));
+
+            FileOpenedEventArgs? receivedArgs = null;
+            _sut.FileOpened += (_, args) => receivedArgs = args;
+
+            // Act
+            _sut.AddFileTab(new FileTabRequest { FileName = shortcut });
+
+            // Assert
+            Assert.That(receivedArgs, Is.Not.Null);
+            Assert.That(receivedArgs!.UnresolvedShortcuts, Is.EqualTo(new[] { shortcut }),
+                "the user has to be told why the shortcut opens as binary data");
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
+    public void AddFileTab_ResolvedShortcut_DoesNotReportUnresolvedShortcut ()
+    {
+        // Arrange
+        var directory = TestShortcuts.CreateTempDirectory("ShortcutResolved");
+
+        try
+        {
+            var log = Path.Join(directory, "actual.log");
+            File.WriteAllText(log, "line1");
+
+            var shortcut = Path.Join(directory, "actual.lnk");
+            TestShortcuts.Create(shortcut, log);
+
+            FileOpenedEventArgs? receivedArgs = null;
+            _sut.FileOpened += (_, args) => receivedArgs = args;
+
+            // Act
+            _sut.AddFileTab(new FileTabRequest { FileName = shortcut });
+
+            // Assert
+            Assert.That(receivedArgs, Is.Not.Null);
+            Assert.That(receivedArgs!.UnresolvedShortcuts, Is.Null);
         }
         finally
         {
@@ -878,6 +939,41 @@ internal class FileOperationServiceTests : IDisposable
         Assert.That(receivedArgs, Is.Not.Null);
         Assert.That(receivedArgs!.MultiFileNames, Is.EqualTo(fileNames));
         Assert.That(receivedArgs.EncodingOptions, Is.Not.Null);
+    }
+
+    [Test]
+    public void AddMultiFileTab_Shortcuts_SortsByResolvedTargetName ()
+    {
+        // Arrange
+        var directory = TestShortcuts.CreateTempDirectory("ShortcutSort");
+
+        try
+        {
+            var firstTarget = Path.Join(directory, "a.log");
+            var secondTarget = Path.Join(directory, "b.log");
+            File.WriteAllText(firstTarget, "first");
+            File.WriteAllText(secondTarget, "second");
+
+            // The shortcut names sort in the opposite order of their targets.
+            var zShortcut = Path.Join(directory, "z.lnk");
+            var aShortcut = Path.Join(directory, "a.lnk");
+            TestShortcuts.Create(zShortcut, firstTarget);
+            TestShortcuts.Create(aShortcut, secondTarget);
+
+            string[]? multiFileNames = null;
+            _sut.FileOpened += (_, e) => multiFileNames = e.MultiFileNames;
+
+            // Act
+            _ = _sut.AddMultiFileTab([zShortcut, aShortcut]);
+
+            // Assert
+            Assert.That(multiFileNames, Is.EqualTo(new[] { firstTarget, secondTarget }),
+                "multi-file order must follow the resolved target names, not the shortcut names");
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
     }
 
     [Test]
@@ -1294,6 +1390,10 @@ internal class FileOperationServiceTests : IDisposable
         Assert.That(_factoryCalls[1].Request.FileName, Is.EqualTo("b.log"));
     }
 
+    /// <summary>
+    /// Creates a temporary directory holding a session file and a shortcut to it, and returns the
+    /// three paths. The caller owns the directory and deletes it.
+    /// </summary>
     private static (string Directory, string Shortcut, string Session) CreateShortcutToSession ()
     {
         var directory = TestShortcuts.CreateTempDirectory("ShortcutSession");
@@ -1307,6 +1407,10 @@ internal class FileOperationServiceTests : IDisposable
         return (directory, shortcut, session);
     }
 
+    /// <summary>
+    /// Builds a second service on the shared config manager, standing in for another LogTabWindow
+    /// of the same session with its own tab controller.
+    /// </summary>
     private FileOperationService CreateServiceForWindows (params LogWindow[] windows)
     {
         var tabControllerMock = new Mock<ITabController>();

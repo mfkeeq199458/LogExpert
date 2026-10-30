@@ -11,9 +11,6 @@ using SLGP = Vanara.PInvoke.Shell32.SLGP;
 
 namespace LogExpert.UI.Services.FileOperationService;
 
-/// <summary>
-/// Resolves a Windows shortcut (<c>.lnk</c>) to the local file at the end of its chain.
-/// </summary>
 [SupportedOSPlatform("windows")]
 internal static class ShortcutResolver
 {
@@ -40,9 +37,7 @@ internal static class ShortcutResolver
 
     #region Public methods
 
-    /// <summary>
-    /// Follows <paramref name="fileName"/> through at most <see cref="MAX_SHORTCUT_HOPS"/> shortcuts.
-    /// </summary>
+    /// <summary>Follows <paramref name="fileName"/> through at most <see cref="MAX_SHORTCUT_HOPS"/> shortcuts.</summary>
     /// <returns>
     /// The final existing target; otherwise the last path that could not be followed (the input
     /// itself when the hop limit is reached).
@@ -106,7 +101,7 @@ internal static class ShortcutResolver
 
     #region Private methods
 
-    private static bool IsShortcut (string fileName)
+    internal static bool IsShortcut (string fileName)
     {
         return !string.IsNullOrWhiteSpace(fileName)
                && Path.GetExtension(fileName).Equals(SHORTCUT_EXTENSION, StringComparison.OrdinalIgnoreCase);
