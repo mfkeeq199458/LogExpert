@@ -8,6 +8,7 @@ using NLog;
 using IShellLinkW = Vanara.PInvoke.Shell32.IShellLinkW;
 using CShellLinkW = Vanara.PInvoke.Shell32.CShellLinkW;
 using SLGP = Vanara.PInvoke.Shell32.SLGP;
+using STGM = Vanara.PInvoke.STGM;
 
 namespace LogExpert.UI.Services.FileOperationService;
 
@@ -24,8 +25,6 @@ internal static class ShortcutResolver
 
     // A chain is followed to its end, but a broken or cyclic chain must not load COM objects forever.
     internal const int MAX_SHORTCUT_HOPS = 3;
-
-    private const int STGM_READ = 0;
 
     #endregion
 
@@ -126,7 +125,7 @@ internal static class ShortcutResolver
             }
 
             shellLink = (IShellLinkW)new CShellLinkW();
-            ((IPersistFile)shellLink).Load(fileName, STGM_READ);
+            ((IPersistFile)shellLink).Load(fileName, (int)STGM.STGM_READ);
 
             var buffer = new StringBuilder(TARGET_PATH_CAPACITY);
             shellLink.GetPath(buffer, buffer.Capacity, out _, SLGP.SLGP_RAWPATH);
